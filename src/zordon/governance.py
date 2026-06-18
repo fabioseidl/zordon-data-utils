@@ -18,7 +18,7 @@ class Governance:
 
     The catalog / schema naming standard:
 
-        catalog : uc_{country}_{region}_{environment}
+        catalog : uc_{region}_{country}_{environment}
         schema  : bronze/silver -> {layer}_{domain}_{subdomain}
                   gold          -> {layer}_{domain}_{subdomain}_{data_product}
         fqn     : {catalog}.{schema}.{table_name}
@@ -105,7 +105,7 @@ class Governance:
         return True
 
     def catalog_name(self):
-        return f"uc_{self.country}_{self.region}_{self.environment}"
+        return f"uc_{self.region}_{self.country}_{self.environment}"
 
     def schema_name(self):
         # Bronze/silver: source + context only. Gold: adds the data_product.

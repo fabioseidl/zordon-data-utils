@@ -10,7 +10,7 @@ managed Delta tables to those names.
 
 Naming standard
 ---------------
-    catalog : uc_{country}_{region}_{environment}            -> uc_br_sa_dev
+    catalog : uc_{region}_{country}_{environment}            -> uc_sa_br_dev
 
     schema depends on the layer:
       bronze / silver : {layer}_{domain}_{subdomain}                  -> bronze_binance_ohlcv / silver_market_ohlcv

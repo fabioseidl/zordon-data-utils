@@ -16,7 +16,7 @@ def _gov(**overrides):
 
 
 def test_catalog_name():
-    assert _gov().catalog_name() == "uc_br_sa_dev"
+    assert _gov().catalog_name() == "uc_sa_br_dev"
 
 
 def test_bronze_schema_is_source_context():
@@ -36,7 +36,7 @@ def test_gold_schema_includes_data_product():
 
 
 def test_fqn():
-    assert _gov().fqn("daily") == "uc_br_sa_dev.bronze_binance_ohlcv.daily"
+    assert _gov().fqn("daily") == "uc_sa_br_dev.bronze_binance_ohlcv.daily"
 
 
 @pytest.mark.parametrize("overrides", [

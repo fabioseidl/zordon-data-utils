@@ -31,11 +31,11 @@ Out of scope:
 
 | Part    | Pattern                                                | Example                                                                 |
 | ------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Catalog | `uc_{country}_{region}_{environment}`                  | `uc_br_sa_dev`                                                          |
+| Catalog | `uc_{region}_{country}_{environment}`                  | `uc_sa_br_dev`                                                          |
 | Schema (bronze/silver) | `{layer}_{domain}_{subdomain}`          | `bronze_binance_ohlcv` / `silver_market_ohlcv`                          |
 | Schema (gold)          | `{layer}_{domain}_{subdomain}_{data_product}` | `gold_finance_investments_market_analysis`                      |
 | Table   | `{table_name}`                                         | `daily`                                                               |
-| FQN     | `{catalog}.{schema}.{table_name}`                      | `uc_br_sa_dev.bronze_binance_ohlcv.daily`                            |
+| FQN     | `{catalog}.{schema}.{table_name}`                      | `uc_sa_br_dev.bronze_binance_ohlcv.daily`                            |
 
 Each medallion layer is organised by a different principle, so the `domain`/`subdomain` controlled vocabulary is **layer-dependent**:
 
@@ -209,7 +209,7 @@ Behaviour details:
   - The first invalid part raises and stops construction.
   - Because `layer` is validated first, the right domain/subdomain vocabulary is always selected before `domain`/`subdomain` are checked.
 - `validate_vocabulary` raises listing the allowed keys, e.g. `"'layer'='raw' is not allowed. Allowed: ['bronze', 'silver', 'gold']"`. For the subdomain it is called with `subdomains.get(domain, {})` for the layer's subdomain dict.
-- `catalog_name` returns `f"uc_{country}_{region}_{environment}"`.
+- `catalog_name` returns `f"uc_{region}_{country}_{environment}"`.
 - `schema_name` is layer-dependent:
   - gold: `f"{layer}_{domain}_{subdomain}_{data_product}"`,
   - bronze/silver: `f"{layer}_{domain}_{subdomain}"`.
@@ -279,7 +279,7 @@ gov = zordon.Governance(
 
 client = zordon.DataClient(spark, gov)
 
-# write -> uc_br_sa_dev.bronze_binance_ohlcv.daily
+# write -> uc_sa_br_dev.bronze_binance_ohlcv.daily
 client.write_table(df, "daily", mode="overwrite", partition_cols=["rate_date"])
 
 # reprocess only the partitions present in df (dynamic partition overwrite)

@@ -98,7 +98,7 @@ gov = zordon.Governance(
 
 client = zordon.DataClient(spark, gov)
 
-# writes to: uc_br_sa_dev.bronze_binance_ohlcv.daily
+# writes to: uc_sa_br_dev.bronze_binance_ohlcv.daily
 client.write_table(df, "daily", mode="overwrite", partition_cols=["rate_date"])
 
 # overwrite only the partitions present in df (dynamic partition overwrite)
@@ -182,11 +182,11 @@ gold.upsert_table(dim, "dim_symbol", merge_keys="symbol_id")
 
 | Name    | Built as                                            | Example                                                            |
 | ------- | --------------------------------------------------- | ------------------------------------------------------------------ |
-| Catalog | `uc_{country}_{region}_{environment}`               | `uc_br_sa_dev`                                                     |
+| Catalog | `uc_{region}_{country}_{environment}`               | `uc_sa_br_dev`                                                     |
 | Schema (bronze/silver) | `{layer}_{domain}_{subdomain}`       | `bronze_binance_ohlcv` / `silver_market_ohlcv`                    |
 | Schema (gold)          | `{layer}_{domain}_{subdomain}_{data_product}` | `gold_finance_investments_market_analysis`              |
 | Table   | `{table_name}` (you pass this to `write_table`)     | `daily`                                                           |
-| FQN     | `{catalog}.{schema}.{table_name}`                   | `uc_br_sa_dev.bronze_binance_ohlcv.daily`                       |
+| FQN     | `{catalog}.{schema}.{table_name}`                   | `uc_sa_br_dev.bronze_binance_ohlcv.daily`                       |
 
 Each layer is organised by a different principle, so the `domain`/`subdomain` values you pass depend on the layer:
 

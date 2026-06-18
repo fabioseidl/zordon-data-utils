@@ -18,7 +18,7 @@ def proj():
 def test_governance_reuses_catalog_parts(proj):
     gov = proj.governance(layer="silver", domain="market", subdomain="ohlcv")
     assert isinstance(gov, Governance)
-    assert gov.catalog_name() == "uc_br_sa_dev"
+    assert gov.catalog_name() == "uc_sa_br_dev"
     assert gov.schema_name() == "silver_market_ohlcv"
 
 
@@ -34,9 +34,9 @@ def test_clients_for_different_schemas_are_independent(proj):
     silver = proj.client(layer="silver", domain="market", subdomain="ohlcv")
     gold = proj.client(layer="gold", domain="finance", subdomain="investments",
                        data_product="market_analysis")
-    assert silver.governance.fqn("daily") == "uc_br_sa_dev.silver_market_ohlcv.daily"
+    assert silver.governance.fqn("daily") == "uc_sa_br_dev.silver_market_ohlcv.daily"
     assert gold.governance.fqn("fact_ohlcv") == \
-        "uc_br_sa_dev.gold_finance_investments_market_analysis.fact_ohlcv"
+        "uc_sa_br_dev.gold_finance_investments_market_analysis.fact_ohlcv"
 
 
 def test_invalid_schema_parts_raise(proj):

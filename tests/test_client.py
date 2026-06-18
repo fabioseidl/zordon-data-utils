@@ -107,7 +107,7 @@ def client():
 def test_read_table_no_filter(client):
     df = client.read_table("daily")
     assert df.applied == []
-    assert client.spark.read.last_fqn == "uc_br_sa_dev.bronze_binance_ohlcv.daily"
+    assert client.spark.read.last_fqn == "uc_sa_br_dev.bronze_binance_ohlcv.daily"
 
 
 def test_read_table_string_filter(client):
@@ -135,9 +135,9 @@ def test_write_table_rejects_bad_mode(client):
 def test_write_table_creates_schema_and_saves(client):
     df = FakeDataFrame()
     fqn = client.write_table(df, "daily", mode="overwrite", partition_cols=["rate_date"])
-    assert fqn == "uc_br_sa_dev.bronze_binance_ohlcv.daily"
+    assert fqn == "uc_sa_br_dev.bronze_binance_ohlcv.daily"
     assert client.spark.sql_calls == [
-        "CREATE SCHEMA IF NOT EXISTS `uc_br_sa_dev`.`bronze_binance_ohlcv`"
+        "CREATE SCHEMA IF NOT EXISTS `uc_sa_br_dev`.`bronze_binance_ohlcv`"
     ]
     assert ("saveAsTable", fqn) in df.write_calls
     assert ("partitionBy", ("rate_date",)) in df.write_calls
@@ -173,14 +173,14 @@ def test_upsert_rejects_unsafe_merge_key(client):
 def test_upsert_creates_table_when_missing(client):
     df = FakeDataFrame()
     fqn = client.upsert_table(df, "daily", merge_keys="symbol", partition_cols=["rate_date"])
-    assert fqn == "uc_br_sa_dev.bronze_binance_ohlcv.daily"
+    assert fqn == "uc_sa_br_dev.bronze_binance_ohlcv.daily"
     # table did not exist -> created via a plain overwrite write
     assert ("saveAsTable", fqn) in df.write_calls
     assert ("partitionBy", ("rate_date",)) in df.write_calls
 
 
 def test_upsert_merges_when_table_exists(monkeypatch):
-    fqn = "uc_br_sa_dev.bronze_binance_ohlcv.daily"
+    fqn = "uc_sa_br_dev.bronze_binance_ohlcv.daily"
     client = _client(existing_tables=[fqn])
 
     calls = {}
