@@ -10,7 +10,7 @@ managed Delta tables to those names.
 
 Naming standard
 ---------------
-    catalog : {prefix}_uc_{country}_{region}_{environment}   -> proj_uc_br_sa_dev
+    catalog : uc_{country}_{region}_{environment}            -> uc_br_sa_dev
 
     schema depends on the layer:
       bronze / silver : {layer}_{domain}_{subdomain}                  -> bronze_binance_ohlcv / silver_market_ohlcv
@@ -31,17 +31,27 @@ Quick start
     import zordon
 
     gov = zordon.Governance(
-        prefix="proj", country="br", region="sa", environment="dev",
+        country="br", region="sa", environment="dev",
         layer="bronze", domain="binance", subdomain="ohlcv",
     )
     client = zordon.DataClient(spark, gov)
     client.write_table(df, "daily", mode="overwrite", partition_cols=["rate_date"])
     df = client.read_table("daily", filters="rate_date >= '2026-06-01'")
+
+When a notebook touches several schemas (e.g. read silver, write gold), use a
+Project so the catalog parts are stated once and you get a client per schema::
+
+    proj = zordon.Project(spark, country="br", region="sa", environment="dev")
+    silver = proj.client(layer="silver", domain="market", subdomain="ohlcv")
+    gold   = proj.client(layer="gold", domain="finance",
+                         subdomain="investments", data_product="market_analysis")
+    gold.write_table(silver.read_table("daily"), "fact_ohlcv")
 """
 
 from .errors import GovernanceError
 from .governance import Governance
 from .client import DataClient
+from .project import Project
 from .vocabularies import (
     LAYERS, COUNTRIES, ENVIRONMENTS,
     BRONZE_DOMAINS, BRONZE_SUBDOMAINS,
@@ -53,7 +63,7 @@ from .vocabularies import (
 __version__ = "1.4.0"
 
 __all__ = [
-    "Governance", "DataClient", "GovernanceError",
+    "Project", "Governance", "DataClient", "GovernanceError",
     "LAYERS", "COUNTRIES", "ENVIRONMENTS",
     "BRONZE_DOMAINS", "BRONZE_SUBDOMAINS",
     "SILVER_DOMAINS", "SILVER_SUBDOMAINS",

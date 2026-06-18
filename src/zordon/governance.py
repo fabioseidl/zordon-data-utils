@@ -18,7 +18,7 @@ class Governance:
 
     The catalog / schema naming standard:
 
-        catalog : {prefix}_uc_{country}_{region}_{environment}
+        catalog : uc_{country}_{region}_{environment}
         schema  : bronze/silver -> {layer}_{domain}_{subdomain}
                   gold          -> {layer}_{domain}_{subdomain}_{data_product}
         fqn     : {catalog}.{schema}.{table_name}
@@ -38,9 +38,8 @@ class Governance:
         "order", "group", "by", "join", "on", "as",
     }
 
-    def __init__(self, prefix, country, region, environment,
+    def __init__(self, country, region, environment,
                  layer, domain, subdomain, data_product=None):
-        self.prefix = prefix
         self.country = country
         self.region = region
         self.environment = environment
@@ -65,7 +64,6 @@ class Governance:
                                  f"subdomain (domain='{domain}')")
 
         # free-form format.
-        self.validate_name(prefix, "prefix")
         self.validate_name(region, "region")
 
         # data_product belongs to the gold layer only. Bronze/silver schemas
@@ -107,7 +105,7 @@ class Governance:
         return True
 
     def catalog_name(self):
-        return f"{self.prefix}_uc_{self.country}_{self.region}_{self.environment}"
+        return f"uc_{self.country}_{self.region}_{self.environment}"
 
     def schema_name(self):
         # Bronze/silver: source + context only. Gold: adds the data_product.

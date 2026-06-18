@@ -81,8 +81,8 @@ SILVER_SUBDOMAINS = {
 }
 
 # --- Gold: organised by BUSINESS / DATA PRODUCT -----------------------------
-# In gold the domain/subdomain no longer describe where data came from; they
-# describe the business product built on top of the conformed data. The
+# In gold the domain/subdomain describe the business product built on top of the
+# conformed data, not where the data came from. The
 # free-form data_product completes the name. Example:
 #   domain="finance", subdomain="investments", data_product="market_analysis"
 GOLD_DOMAINS = {

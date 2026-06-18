@@ -8,7 +8,7 @@ from zordon import Governance, GovernanceError
 
 def _gov(**overrides):
     base = dict(
-        prefix="proj", country="br", region="sa", environment="dev",
+        country="br", region="sa", environment="dev",
         layer="bronze", domain="binance", subdomain="ohlcv",
     )
     base.update(overrides)
@@ -16,7 +16,7 @@ def _gov(**overrides):
 
 
 def test_catalog_name():
-    assert _gov().catalog_name() == "proj_uc_br_sa_dev"
+    assert _gov().catalog_name() == "uc_br_sa_dev"
 
 
 def test_bronze_schema_is_source_context():
@@ -36,7 +36,7 @@ def test_gold_schema_includes_data_product():
 
 
 def test_fqn():
-    assert _gov().fqn("daily") == "proj_uc_br_sa_dev.bronze_binance_ohlcv.daily"
+    assert _gov().fqn("daily") == "uc_br_sa_dev.bronze_binance_ohlcv.daily"
 
 
 @pytest.mark.parametrize("overrides", [
@@ -45,8 +45,8 @@ def test_fqn():
     {"layer": "silver", "domain": "binance"},           # source domain in silver
     {"layer": "bronze", "domain": "market"},            # conformed domain in bronze
     {"domain": "binance", "subdomain": "fear_greed"},   # wrong subdomain for domain
-    {"prefix": "Proj"},                                 # not snake_case
-    {"prefix": "select"},                               # reserved word
+    {"region": "Sa"},                                   # not snake_case
+    {"region": "select"},                               # reserved word
 ])
 def test_invalid_inputs_raise(overrides):
     with pytest.raises(GovernanceError):
