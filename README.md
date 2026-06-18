@@ -1,6 +1,6 @@
 # zordon — User Guide
 
-`zordon` is a small helper for our Databricks project. It exists so that every
+`zordon` is a small helper for our mentory Databricks project. It exists so that every
 developer working on the project in parallel writes tables to Unity Catalog
 using the **same naming rules**. You give it the parts of a name, it validates
 them against the project's agreed vocabulary, and it writes a managed Delta
