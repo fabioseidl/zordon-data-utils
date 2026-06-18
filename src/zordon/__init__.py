@@ -52,6 +52,10 @@ from .errors import GovernanceError
 from .governance import Governance
 from .client import DataClient
 from .project import Project
+from .naming import (
+    validate_name, is_valid_name, name_violation,
+    MAX_NAME_LENGTH, SQL_RESERVED_WORDS,
+)
 from .vocabularies import (
     LAYERS, COUNTRIES, ENVIRONMENTS,
     BRONZE_DOMAINS, BRONZE_SUBDOMAINS,
@@ -60,10 +64,12 @@ from .vocabularies import (
     DOMAIN_VOCAB_BY_LAYER,
 )
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 __all__ = [
     "Project", "Governance", "DataClient", "GovernanceError",
+    "validate_name", "is_valid_name", "name_violation",
+    "MAX_NAME_LENGTH", "SQL_RESERVED_WORDS",
     "LAYERS", "COUNTRIES", "ENVIRONMENTS",
     "BRONZE_DOMAINS", "BRONZE_SUBDOMAINS",
     "SILVER_DOMAINS", "SILVER_SUBDOMAINS",

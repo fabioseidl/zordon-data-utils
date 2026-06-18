@@ -1,6 +1,6 @@
 # zordon — Library Specification
 
-Version: 1.4
+Version: 1.5
 
 Status: reference / validation document
 
@@ -12,10 +12,13 @@ It is packaged as a small, dependency-light Python package under a `src` layout 
 
 ## 2. Scope
 
-In scope (v1.4):
-- Two-tier validation of naming inputs:
+In scope (v1.5):
+- Validation of naming inputs:
   - controlled vocabulary (value must exist in a fixed dictionary), and
-  - free-form format (lowercase snake_case).
+  - free-form identifiers against four rule tiers (native UC constraints,
+    strict snake_case, SQL/system reserved, governance/org rules).
+- Standalone identifier validation for catalogs, schemas and tables
+  (`validate_name` / `is_valid_name` / `name_violation`).
 - Construction of catalog, schema and fully qualified names (FQN).
 - Writing **managed** Delta tables to Unity Catalog (overwrite / append).
 - Upserting (Delta `MERGE`) into a managed table on a set of key columns.
@@ -164,25 +167,37 @@ Notes:
 - `DOMAIN_VOCAB_BY_LAYER` maps each layer to its `(domains, subdomains)` pair; it is what `Governance` uses to pick the allow-list.
 - Crypto-market (CryptoLake) interpretation: bronze domains are the sources (Binance/Poloniex exchanges and the Alternative.me sentiment provider); silver domains are the conformed areas (`market`, `sentiment`) merged across sources; gold domains/subdomains are the analytical products built on top.
 
-### 4.2 Free-form format check
+### 4.2 Free-form name check (identifier rules)
 
-Fields: `region`, `data_product` (gold layer only), `table_name`.
+Fields: `region`, `data_product` (gold layer only), `table_name`. These have no fixed allow-list, so they are validated against the identifier rules implemented in `zordon.naming` and usable standalone for any catalog / schema / table name. The rules are split into **four tiers**, checked in order; the first one a name breaks is reported with its tier, so it is clear whether a name fails a hard technical limit or an organizational policy.
 
-These have no fixed list, so they are only checked for format. The value must:
+**Tier 1 — native (Unity Catalog technical constraints).** Hard limits enforced by the platform:
 
-- be a non-empty string,
-- match the regex `^[a-z][a-z0-9]*(_[a-z0-9]+)*$` (lowercase, starts with a letter, single underscores only, characters `[a-z0-9_]`),
-- not be in the reserved-word exclusion list.
+- non-empty, and at most `MAX_NAME_LENGTH` = 255 characters;
+- must not contain the forbidden characters period (`.`), space (` `), forward slash (`/`), or ASCII control characters (`0x00`–`0x1F`, `0x7F`).
 
-Reserved-word list (kept intentionally small): `select, from, where, table, catalog, schema, database, create, drop, insert, update, delete, grant, user, order, group, by, join, on, as`.
+**Tier 2 — format (strict snake_case convention).** Must match `^[a-z][a-z0-9_]*$`: lowercase letters, digits and underscores, starting with a letter. This rejects uppercase, hyphens (which would force backticks in SQL), and leading digits.
 
-Any violation raises `GovernanceError`.
+**Tier 3 — reserved (SQL engine + system).** Rejected:
+
+- a leading underscore `_` (reserved for pseudo-columns / metadata, e.g. `_metadata`) — reported before the format tier so the reason is precise;
+- names starting with the system-reserved prefixes `sys` or `databricks`;
+- exact SQL reserved words (`SQL_RESERVED_WORDS`): the Spark/Databricks join & set keywords `anti, cross, except, full, inner, intersect, join, lateral, left, mask, minus, natural, on, right, semi, union, using, null, default, true, false`, plus common ANSI DML/DDL words `select, from, where, table, catalog, schema, database, create, drop, insert, update, delete, grant, user, order, group, by, as`.
+
+**Tier 4 — governance (organizational rules).** Names that pollute the catalog with manual versioning / environment hints are rejected; rely on Delta Lake time travel and catalog/schema isolation instead:
+
+- a manual version indicator as the last token (`_v[0-9]+`, e.g. `customers_v2`);
+- a versioning / temp term as the last token: `old, new, backup, bkp, temp, tmp, final`;
+- an environment term as the first or last token: `test, teste, dev, prod, sandbox` (e.g. `test_users`, `users_dev`);
+- a name ending in a number (e.g. `table1`, `table_1`, `fact_sales_2026`).
+
+Any violation raises `GovernanceError`, whose message names the offending value, the reason, and the tier (e.g. `[native rule]`, `[governance rule]`). Note environment values like `dev`/`prd` are still fine in the *catalog* name — Tier 4 only applies to the free-form name parts, never to the controlled `environment` vocabulary.
 
 ## 5. Classes and Methods
 
 ### 5.1 `GovernanceError(Exception)`
 
-Raised whenever a name part fails either validation tier. No custom attributes.
+Raised whenever a name part fails validation — a controlled-vocabulary check, the gold-only `data_product` rule, or any of the four identifier tiers (native / format / reserved / governance). No custom attributes.
 
 ### 5.2 `Governance`
 
@@ -191,7 +206,7 @@ Validates the naming inputs and builds catalog / schema / FQN names. All parts a
 | Method               | Description                                                                                            | Parameters                                                                                                                              | Returns                              |
 | -------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | `__init__`           | Stores all name parts and validates each one (vocabulary or format as appropriate). Raises if invalid.  | `country: str`, `region: str`, `environment: str`, `layer: str`, `domain: str`, `subdomain: str`, `data_product: str = None` (required for gold, forbidden otherwise) | `None`                               |
-| `validate_name`      | Format check for a free-form name part.                                                                 | `name: str`, `label: str = "name"`                                                                                                      | `bool` (or raises `GovernanceError`) |
+| `validate_name`      | Validates a free-form name part against the four identifier tiers (delegates to `zordon.naming.validate_name`). | `name: str`, `label: str = "name"`                                                                                            | `bool` (or raises `GovernanceError`) |
 | `validate_vocabulary`| Membership check of a value against an allow-list dictionary (flat).                                    | `value: str`, `allowed: dict`, `label: str = "name"`                                                                                    | `bool` (or raises `GovernanceError`) |
 | `catalog_name`       | Builds the Unity Catalog catalog name.                                                                  | none                                                                                                                                    | `str`                                |
 | `schema_name`        | Builds the Unity Catalog schema name.                                                                   | none                                                                                                                                    | `str`                                |
@@ -261,6 +276,31 @@ A factory that holds the constant catalog parts (`country` / `region` / `environ
 Behaviour details:
 - `governance` / `client` delegate validation to `Governance.__init__`, so the same per-layer vocabulary rules and the gold-only `data_product` rule apply, and invalid parts raise `GovernanceError`.
 - You need a new `client` only when the **schema** changes; multiple tables in the same schema (e.g. several gold fact/dimension tables) reuse one client.
+
+### 5.5 `zordon.naming` (identifier validation)
+
+The identifier rules from §4.2 live in `zordon.naming` and are exported at the package top level for validating any catalog / schema / table name on their own (not only the parts `Governance` builds).
+
+| Function           | Description                                                                                          | Parameters                          | Returns                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------- |
+| `validate_name`    | Validates one identifier; raises `GovernanceError` (with tier + reason) on the first rule it breaks. | `name: str`, `label: str = "name"`  | `bool` (or raises `GovernanceError`)           |
+| `is_valid_name`    | Boolean shortcut — does the name pass every tier?                                                    | `name: str`                         | `bool`                                         |
+| `name_violation`   | Returns `(tier, reason)` for the first rule broken, or `None` if the name is clean.                  | `name: str`                         | `tuple[str, str] \| None`                      |
+
+Exposed rule constants: `MAX_NAME_LENGTH`, `STRICT_SNAKE_CASE`, `NATIVE_FORBIDDEN_CHARS`, `SQL_RESERVED_WORDS`, `SYSTEM_RESERVED_PREFIXES`, `VERSIONING_SUFFIXES`, `ENVIRONMENT_TERMS`. `tier` is one of `"native"`, `"format"`, `"reserved"`, `"governance"`.
+
+Test-case mapping (from the naming standard):
+
+| Name              | Status   | Reason                                              |
+| ----------------- | -------- | -------------------------------------------------- |
+| `fact_sales`      | approved | clean snake_case                                   |
+| `fact_sales_2026` | rejected | ends with a number (governance)                    |
+| `customers_v2`    | rejected | manual version indicator (governance)              |
+| `suppliers_old`   | rejected | forbidden suffix `_old` (governance)               |
+| `test_users`      | rejected | environment term `test` (governance)               |
+| `select`          | rejected | SQL reserved word (reserved)                        |
+| `sys_reg_table`   | rejected | reserved prefix `sys` (reserved)                    |
+| `table.name`      | rejected | native forbidden character `.` (native)            |
 
 ## 6. Usage Example
 
@@ -335,6 +375,7 @@ src/zordon/
     project.py      # Project (factory for per-schema clients)
     governance.py   # Governance
     client.py       # DataClient
+    naming.py       # identifier validation (catalogs / schemas / tables)
     vocabularies.py # controlled vocabularies (allowed values)
     errors.py       # GovernanceError
 pyproject.toml      # build/install configuration
@@ -383,3 +424,4 @@ PySpark is the only runtime dependency and is already present on Databricks, so 
 - The vocabularies are module-level constants in `src/zordon/vocabularies.py`, one shared source of truth edited by the project owner (not passed per developer). The bronze and silver context lists share the `_MARKET_CONTEXTS` dict, so editing it updates both layers together.
 - The Unity Catalog catalog is created once by the project owner and shared; the library never creates it.
 - `country` and `region` are both part of the catalog name, matching the documented naming standard.
+- Identifier validation (`zordon.naming`) separates **native** UC technical constraints from **format**, **reserved** and **governance** rules, so a rejection makes clear whether it broke a hard platform limit or an organizational policy. Governance rules apply only to free-form name parts, never to the controlled `environment` vocabulary, so `dev`/`prd` remain valid in the catalog name.

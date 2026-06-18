@@ -19,6 +19,7 @@ zordon-data-utils/
 │       ├── project.py      # Project: factory for per-schema clients
 │       ├── governance.py   # Governance: validation + name building
 │       ├── client.py       # DataClient: read/write managed Delta tables
+│       ├── naming.py       # identifier validation (catalogs/schemas/tables)
 │       ├── vocabularies.py # the controlled vocabularies (allowed values)
 │       └── errors.py       # GovernanceError
 └── tests/                  # unit tests (no Spark required)
@@ -74,7 +75,7 @@ Then install the `.whl` on the cluster, either:
 - in a notebook:
 
   ```python
-  %pip install /Volumes/<catalog>/<schema>/<vol>/zordon-1.4.0-py3-none-any.whl
+  %pip install /Volumes/<catalog>/<schema>/<vol>/zordon-1.5.0-py3-none-any.whl
   ```
 
 After install, `import zordon` works on every notebook attached to the cluster. This is the recommended path once the vocabularies are stable.
@@ -246,7 +247,27 @@ Domain and subdomain — **the allowed values depend on the layer** (a subdomain
 
 So `domain="binance"` is valid in bronze but rejected in silver/gold; `fear_greed` is only valid under `alternative_me` (bronze) or `sentiment` (silver).
 
-The remaining fields are free-form and only need to be lowercase snake_case: `region`, `data_product` (gold only), and the `table_name` you pass to `write_table`. "snake_case" here means: starts with a letter, only lowercase letters, digits and single underscores, no leading/trailing/double underscore (for example `market_analysis`, `daily`, `fear_greed`). Reserved SQL words such as `select` or `table` are also rejected.
+The remaining fields are free-form identifiers: `region`, `data_product` (gold only), and the `table_name` you pass to `write_table`/`upsert_table`. They are validated against the identifier rules in the next section, so they must be lowercase snake_case and must not use reserved or governance-discouraged names.
+
+### Identifier rules (catalogs, schemas, tables)
+
+Every free-form name is checked against four tiers of rules; the first one it breaks is reported with its tier, so you know whether it failed a hard platform limit or a project policy. The same rules are available standalone for any name:
+
+```python
+import zordon
+
+zordon.is_valid_name("fact_sales")        # True
+zordon.is_valid_name("fact_sales_2026")   # False
+zordon.name_violation("suppliers_old")    # ('governance', "ends with the forbidden suffix '_old' ...")
+zordon.validate_name("table.name")        # raises GovernanceError ([native rule])
+```
+
+1. **native** (Unity Catalog technical limits) — at most 255 chars; no `.`, space, `/`, or ASCII control characters.
+2. **format** (convention) — must match `^[a-z][a-z0-9_]*$`: lowercase letters, digits, underscores, starting with a letter (no uppercase, no hyphens).
+3. **reserved** (SQL / system) — no leading `_`, no `sys`/`databricks` prefix, and not a SQL reserved word (`select`, `join`, `union`, `default`, `true`, …).
+4. **governance** (organizational) — no manual version/temp suffixes (`_v2`, `_old`, `_new`, `_backup`, `_bkp`, `_temp`, `_tmp`, `_final`), no environment terms as the first/last token (`test`, `teste`, `dev`, `prod`, `sandbox`), and no names ending in a number (`table1`, `fact_sales_2026`). Use Delta time travel and catalog/schema isolation instead.
+
+Examples: `fact_sales` ✅ · `fact_sales_2026` ❌ (trailing number) · `customers_v2` ❌ (version) · `suppliers_old` ❌ (suffix) · `test_users` ❌ (environment) · `select` ❌ (reserved) · `sys_reg_table` ❌ (reserved prefix) · `table.name` ❌ (forbidden character).
 
 ## 6. API
 
@@ -279,6 +300,12 @@ Writes and reads managed Delta tables using the names from a `Governance` object
   - a dict of column→value (equality): `read_table("daily", {"rate_date": "2026-06-17"})`
   - a list of conditions (AND-combined): `read_table("daily", ["rate_date >= '2026-06-01'", "symbol = 'BTCUSDT'"])`
 
+### Naming validation (standalone)
+
+- `validate_name(name, label="name")` Validates one identifier; returns `True` or raises `GovernanceError` naming the failing rule and its tier.
+- `is_valid_name(name)` Boolean shortcut — does the name pass every tier?
+- `name_violation(name)` Returns `(tier, reason)` for the first rule broken, or `None` if clean. `tier` is `"native"`, `"format"`, `"reserved"`, or `"governance"`.
+
 ## 7. Common errors
 
 | Message you see                                          | Cause                                                              | Fix                                                        |
@@ -288,8 +315,10 @@ Writes and reads managed Delta tables using the names from a `Governance` object
 | `'subdomain (domain='binance')'='fear_greed' is not allowed` | The subdomain is valid, but not under that domain.             | Use a subdomain that belongs to the domain you chose.      |
 | `'data_product' is required for the 'gold' layer`        | A gold `Governance` was built without a `data_product`.            | Pass a `data_product` when `layer="gold"`.                 |
 | `'data_product' is not allowed for the 'bronze' layer`   | A `data_product` was passed to a bronze/silver `Governance`.        | Omit `data_product` for bronze/silver.                     |
-| `'region'='Sa' is not valid lowercase snake_case`        | A free-form field has uppercase, spaces, or bad underscores.       | Use lowercase snake_case.                                  |
-| `'data_product'='select' is a reserved word`             | A free-form field uses a reserved SQL word.                        | Pick a different name.                                     |
+| `'region'='Sa' is not strict snake_case ... [format rule]` | A free-form field has uppercase, hyphens, or a leading digit.    | Use lowercase snake_case.                                  |
+| `'table_name'='select' is a SQL reserved word [reserved rule]` | A free-form field uses a reserved word or `sys`/`databricks`/`_` prefix. | Pick a different name.                          |
+| `'table_name'='fact_sales_2026' ends with a number ... [governance rule]` | A name ends in a digit or uses a `_old`/`_v2`/`_test` style term. | Drop the version/env/number; use time travel & catalog isolation. |
+| `'table_name'='table.name' contains the forbidden character '.' [native rule]` | A name uses `.`, space, `/`, control chars, or is too long. | Use only `[a-z0-9_]`, ≤ 255 chars.                |
 | `mode must be one of ('append', 'overwrite')`            | `write_table` got an unsupported mode.                             | Use `"overwrite"` or `"append"`.                           |
 | `dynamic_partition_overwrite is only valid with mode='overwrite'` | The flag was passed with `mode="append"`.                | Use it only with `mode="overwrite"`.                       |
 | `merge_keys must be a non-empty column name or list of names` | `upsert_table` got no merge keys.                            | Pass the key column(s), e.g. `["symbol", "rate_date"]`.    |
@@ -300,5 +329,6 @@ Writes and reads managed Delta tables using the names from a `Governance` object
 
 - The catalog is created once by the project owner and shared. `zordon` creates the schema automatically but never the catalog.
 - The allowed values live in `src/zordon/vocabularies.py` as `LAYERS`, `COUNTRIES`, `ENVIRONMENTS`, and the per-layer domain/subdomain dicts: `BRONZE_DOMAINS` / `BRONZE_SUBDOMAINS`, `SILVER_DOMAINS` / `SILVER_SUBDOMAINS`, `GOLD_DOMAINS` / `GOLD_SUBDOMAINS`. The bronze and silver context lists are kept in sync through a shared `_MARKET_CONTEXTS` dict. To add or change an allowed value, the project owner edits that one file and re-publishes the package (rebuild the wheel for Option C, or just re-sync for Options A/B).
+- The identifier rules live in `src/zordon/naming.py` (length limit, forbidden characters, reserved words/prefixes, governance suffixes/terms). Adjust the rule constants there to change policy; the change reaches everyone who imports the package.
 - `zordon` only works with managed Delta tables. It does not handle external tables, permissions, or data-quality checks.
 - Tests live in `tests/` and need no Spark session — run them with `pytest` (`pip install -e .[dev]` first, or `PYTHONPATH=src pytest`).

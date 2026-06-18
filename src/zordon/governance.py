@@ -1,8 +1,7 @@
 """Naming governance: validate the inputs and build catalog / schema / FQN names."""
 
-import re
-
 from .errors import GovernanceError
+from .naming import validate_name as _validate_name
 from .vocabularies import (
     LAYERS, COUNTRIES, ENVIRONMENTS, DOMAIN_VOCAB_BY_LAYER,
 )
@@ -27,16 +26,6 @@ class Governance:
     bronze is by source, silver by context, gold by business product. The
     ``data_product`` is gold-only (required there, forbidden elsewhere).
     """
-
-    # lowercase snake_case: letter first, single underscores only.
-    _NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
-
-    # small reserved-word exclusion list for free-form fields.
-    _RESERVED_WORDS = {
-        "select", "from", "where", "table", "catalog", "schema", "database",
-        "create", "drop", "insert", "update", "delete", "grant", "user",
-        "order", "group", "by", "join", "on", "as",
-    }
 
     def __init__(self, country, region, environment,
                  layer, domain, subdomain, data_product=None):
@@ -91,18 +80,10 @@ class Governance:
         return True
 
     def validate_name(self, name, label="name"):
-        """Format check for a free-form name part.
-        Returns True or raises GovernanceError."""
-        if not isinstance(name, str) or not name:
-            raise GovernanceError(f"'{label}' must be a non-empty string, got: {name!r}")
-        if not self._NAME_PATTERN.match(name):
-            raise GovernanceError(
-                f"'{label}'='{name}' is not valid lowercase snake_case "
-                f"(allowed: ^[a-z][a-z0-9]*(_[a-z0-9]+)*$)"
-            )
-        if name in self._RESERVED_WORDS:
-            raise GovernanceError(f"'{label}'='{name}' is a reserved word and cannot be used")
-        return True
+        """Validate a free-form name part against the full naming rule set
+        (native / format / reserved / governance). Returns True or raises
+        GovernanceError. See :mod:`zordon.naming`."""
+        return _validate_name(name, label)
 
     def catalog_name(self):
         return f"uc_{self.region}_{self.country}_{self.environment}"
