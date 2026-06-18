@@ -1,0 +1,19 @@
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling / IDE
+.pytest_cache/
+.idea/
+.vscode/
+
+# Claude Code files
+.claude/

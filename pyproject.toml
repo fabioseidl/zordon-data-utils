@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zordon"
+version = "1.4.0"
+description = "Naming-governance + managed Delta read/write helper for a student crypto-market project on Databricks."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Mentoria Levva" }]
+keywords = ["databricks", "unity-catalog", "delta", "data-governance", "pyspark"]
+
+# PySpark is provided by the Databricks runtime, so it is NOT a hard install
+# dependency. Install the [spark] extra only for local development/testing.
+dependencies = []
+
+[project.optional-dependencies]
+spark = ["pyspark>=3.4"]
+dev = ["pyspark>=3.4", "pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
